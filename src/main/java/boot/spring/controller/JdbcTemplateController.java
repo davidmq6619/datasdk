@@ -847,17 +847,4 @@ public class JdbcTemplateController {
         String str = "推送数据总数:" +allCount +"。推送成功数据数:"+tjCount;
         return AjaxResult.success(str);
     }
-
-    public static void main(String[] args) {
-        int str = 1 % 2;
-        int str32 = 5 % 3;
-        int str2 = 3 % 2;
-        int str4 = 3 % 4;
-        int str3 = 1 / 2;
-        int str41 = 3 / 2;
-        int str5 = 2 /3;
-        int str56 = 5 /3;
-        int str69 = 3 / 4;
-        System.out.println(1%2);
-    }
 }
