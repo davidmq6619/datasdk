@@ -1,0 +1,33 @@
+server:
+  port: 8088
+
+spring:
+  datasource:
+    hikari:
+      sakila:
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        password: root
+        jdbc-url: jdbc:mysql://localhost:3306/sakila?serverTimezone=GMT%2B8
+        username: root
+        pool-name: DatebookHikariCP_SAKILAMYSQL
+      rest:
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        password: root
+        jdbc-url: jdbc:mysql://localhost:3306/rest?serverTimezone=GMT%2B8
+        username: root
+        pool-name: DatebookHikariCP_RESTMYSQL
+
+logging:
+  config: classpath:logback-spring.xml
+
+ftp:
+  host: 192.168.0.39
+  password: Wsz123
+  port: 21
+  username: wangshenzhan
+
+threadpool:
+  coresize: 20
+  maxsize: 500
+  alivetime: 60
+  queuesize: 5000
