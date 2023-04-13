@@ -847,4 +847,290 @@ public class JdbcTemplateController {
         String str = "推送数据总数:" +allCount +"。推送成功数据数:"+tjCount;
         return AjaxResult.success(str);
     }
+
+    @ApiOperation("医院数据推送定制化-广东省人民医院")
+    @RequestMapping(value = "/meinian/gdyyData", method = RequestMethod.GET)
+    @ResponseBody
+    public AjaxResult gdyyData() {
+        String tableList = SdkConstant.TABLE_STR+"_user_report_list";
+        String tableInfo = SdkConstant.TABLE_STR+"_user_report_info";
+        //获取用户数据
+        AtomicInteger tjCount = new AtomicInteger();
+        int allCount = 0;
+        int i = 0;
+        while (true){
+            try {
+                int offset = i * COUNT;
+                String sql = "select member_id as vid from " + tableInfo +" where member_id not in ('352','356','507','503','489','506','572','508','352','499','550','485','510','560','340','573','504','552','505','500','569','553','555','498','501','356','502','509','574','496','511') group by member_id"+
+                        " LIMIT "+COUNT+" OFFSET "+offset+"";
+                List<CustomerInfo> list = pgTemplate.query(sql, new Object[]{}, new int[]{}, new BeanPropertyRowMapper<>(CustomerInfo.class));
+                int mo = list.size() % 1000;
+                int mo1 = 0;
+                if(mo == 0){
+                    mo1=  list.size() / 1000;
+                }else{
+                    mo1=  list.size() / 1000+1;
+                }
+                List<Thread> listT=new ArrayList<>();
+                CountDownLatch cd = new CountDownLatch(mo1);
+                for(int j=0; j<mo1; j++){
+                    int m = 0;
+                    if(list.size()-j * 1000>=1000){
+                        m=1000;
+                    }else{
+                        m=list.size()-j * 1000;
+                    }
+
+                    List<CustomerInfo> customerInfos = list.subList(j * 1000, (j * 1000)+m);
+                    String s1 = customerInfos.stream().map(info -> "'" + info.getVid() + "'").collect(Collectors.joining(","));
+                    String sql2 = "select member_id as vid,class_name as item_ft ,item_name,result_value results,unit,reference normal_l,image_describe,image_diagnose,data_type from " + tableInfo + " where member_id in("+s1+")";
+                    List<TestData> testDataLists = pgTemplate.query(sql2, new Object[]{}, new int[]{}, new BeanPropertyRowMapper<>(TestData.class));
+                    Map<String, List<TestData>> collect = testDataLists.stream().collect(Collectors.groupingBy(TestData::getVid));
+
+                    listT.add(new Thread(()->{
+                        for (CustomerInfo customer : customerInfos) {
+                            MarketData ord = new MarketData();
+                            int nextInt = new Random().nextInt(9999);
+                            CustomerDto customerDto = new CustomerDto();
+                            int anInt = new Random().nextInt(99999999);
+                            customerDto.setAgentMobile("176"+anInt);
+                            customerDto.setMobile("176"+anInt);
+                            customerDto.setCustSfzh(customer.getVid());
+                            customerDto.setCheckDate(new Date());
+                            customerDto.setShopNo(SdkConstant.SHOP_NO);
+                            customerDto.setCustSex(new Random().nextInt(2)+"");
+                            customerDto.setCustName("赖总"+customer.getVid());
+                            customerDto.setVid(customer.getVid());
+                            customerDto.setCustCsrq(DateUtil.parse("1978-07-08","yyyy-MM-dd"));
+                            ord.setCustomer(customerDto);
+                            //获取检验数据
+                            ArrayList<CheckData> tTestList = new ArrayList<>();
+                            ArrayList<CheckData> tCheckList = new ArrayList<>();
+                            List<TestData> testDataList = collect.get(customer.getVid());
+                            if(testDataList == null){
+                                continue;
+                            }
+                            Boolean flag = false;
+                            for (TestData data : testDataList) {
+                                if("2".equals(data.getData_type())){
+                                    if(StrUtil.isBlank(data.getNormal_l()) && StrUtil.isNotBlank(data.getItem_ft()) && !"血压".equals(data.getItem_ft())){
+                                        CheckData tDataXJ = new CheckData();
+                                        tDataXJ.setCategory(data.getItem_ft());
+                                        tDataXJ.setItemName("小结");
+                                        tDataXJ.setResult(data.getResults());
+                                        tCheckList.add(tDataXJ);
+                                    }else{
+                                        CheckData tData = new CheckData();
+                                        tData.setCategory(data.getItem_ft());
+                                        tData.setItemName(data.getItem_name());
+                                        tData.setNormalL(data.getNormal_l());
+                                        tData.setResult(data.getResults());
+                                        tData.setUnit(data.getUnit());
+                                        tCheckList.add(tData);
+                                    }
+                                }else if("3".equals(data.getData_type())){
+                                    CheckData tData = new CheckData();
+                                    tData.setCategory(data.getItem_ft());
+                                    tData.setItemName(data.getItem_name());
+                                    //tData.setNormalH(data.getNormal_h());
+                                    tData.setNormalL(data.getNormal_l());
+                                    tData.setResult(data.getResults());
+                                    tData.setUnit(data.getUnit());
+                                    tTestList.add(tData);
+                                }
+                                if(StrUtil.isNotBlank(data.getItem_name()) && (data.getItem_name().contains("身高") || data.getItem_name().contains("体重"))){
+                                    flag = true;
+                                }
+                            }
+                            //身高体重默认赋值
+                            if(!flag){
+                                CheckData tData = new CheckData();
+                                CheckData tData2 = new CheckData();
+                                if("0".equals(customerDto.getCustSex())){
+                                    tData.setCategory("一般检查");
+                                    tData.setItemName("身高");
+                                    tData.setResult("160");
+                                    tData.setUnit("Cm");
+                                    tData2.setCategory("一般检查");
+                                    tData2.setItemName("体重");
+                                    tData2.setResult("55");
+                                    tData2.setUnit("kg");
+                                }else{
+                                    tData.setCategory("一般检查");
+                                    tData.setItemName("身高");
+                                    tData.setResult("175");
+                                    tData.setUnit("Cm");
+                                    tData2.setCategory("一般检查");
+                                    tData2.setItemName("体重");
+                                    tData2.setResult("65");
+                                    tData2.setUnit("kg");
+                                }
+                                tCheckList.add(tData);
+                                tCheckList.add(tData2);
+                            }
+                            ord.setCheckData(tCheckList);
+                            ord.setTestData(tTestList);
+                            nextInt = new Random().nextInt(9999);
+                            ord.setOrderNo(System.currentTimeMillis() + String.valueOf(nextInt));
+                            int nextInt2 = new Random().nextInt(9999);
+                            ord.setNonceStr(System.currentTimeMillis() + String.valueOf(nextInt2));
+                            ord.setUsername(SdkConstant.USER_NAME);
+                            ord.setPackageId(SdkConstant.PACKAGE_ID);
+                            ord.setOrderStatus(2);
+                            //加密处理
+                            StringBuffer sb = new StringBuffer();
+                            sb.append("orderNo=" + (ord.getOrderNo() == null ? SdkConstant.NULL_STR : ord.getOrderNo()) + SdkConstant.SPLIT_OTHER);
+                            sb.append("vid=" + (ord.getCustomer().getVid() == null ? SdkConstant.NULL_STR : ord.getCustomer().getVid()) + SdkConstant.SPLIT_OTHER);
+                            sb.append("custName=" + (ord.getCustomer().getCustName() == null ? SdkConstant.NULL_STR : ord.getCustomer().getCustName()) + SdkConstant.SPLIT_OTHER);
+                            sb.append("custSex=" + (ord.getCustomer().getCustSex() == null ? SdkConstant.NULL_STR : ord.getCustomer().getCustSex()) + SdkConstant.SPLIT_OTHER);
+                            sb.append("shopNo=" + (ord.getCustomer().getShopNo() == null ? SdkConstant.NULL_STR : ord.getCustomer().getShopNo()) + SdkConstant.SPLIT_OTHER);
+                            sb.append("custSfzh=" + (ord.getCustomer().getCustSfzh() == null ? SdkConstant.NULL_STR : ord.getCustomer().getCustSfzh()) + SdkConstant.SPLIT_OTHER);
+                            sb.append("agentMobile=" + (ord.getCustomer().getAgentMobile() == null ? SdkConstant.NULL_STR : ord.getCustomer().getAgentMobile()) + SdkConstant.SPLIT_OTHER);
+                            sb.append("checkNum=" + ((ord.getCheckData() == null || ord.getCheckData().size() == 0) ? 0 : ord.getCheckData().size()) + SdkConstant.SPLIT_OTHER);
+                            sb.append("testNum=" + ((ord.getTestData() == null || ord.getTestData().size() == 0) ? 0 : ord.getTestData().size()) + SdkConstant.SPLIT_OTHER);
+                            sb.append("nonceStr=" + (ord.getNonceStr() == null ? SdkConstant.NULL_STR : ord.getNonceStr()) + SdkConstant.SPLIT_OTHER);
+                            sb.append("username=" + (ord.getUsername() == null ? SdkConstant.NULL_STR : ord.getUsername()));
+                            AES aes = SecureUtil.aes(HexUtil.decodeHex(SdkConstant.DES_KEY));
+                            String signStr = aes.encryptHex(sb.toString());
+                            //数据组装
+                            ord.setSignStr(signStr);
+                            try {
+                                String s = HttpRequest.post(SdkConstant.URL)
+                                        .header("Content-Type", "application/json")
+                                        .body(JSONUtil.parse(ord))
+                                        .execute()
+                                        .body();
+                                JSONObject jsonObject = JSON.parseObject(s);
+                                if (!"0".equals(jsonObject.get("code"))) {
+                                    LOGGER.error("数据推送失败-》外部订单号=》[{}] 体检编号[{}],结果返回{}", ord.getOrderNo(), ord.getCustomer().getVid(), s);
+                                }else {
+                                    tjCount.getAndIncrement();
+                                }
+                            } catch (Exception e) {
+                                LOGGER.info("数据推送-》外部订单号=》[{}] 体检编号[{}]", ord.getOrderNo(), ord.getCustomer().getVid());
+                                e.printStackTrace();
+                            }
+                        }
+                        cd.countDown();
+                    }));
+
+                }
+                Iterator var13 = listT.iterator();
+                while(var13.hasNext()){
+                    Thread thread = (Thread)var13.next();
+                    thread.start();
+                };
+                cd.await();
+                if(list.size() < COUNT){
+                    allCount = i * COUNT + list.size();
+                    break;
+                }
+
+            }catch (Exception e){
+                LOGGER.error(e.getMessage());
+            }finally {
+                i++;
+            }
+        }
+        String str = "推送数据总数:" +allCount +"。推送成功数据数:"+tjCount;
+        return AjaxResult.success(str);
+    }
+    @ApiOperation("美年线上数据推送")
+    @RequestMapping(value = "/meinian/mnDataOnline/{words}", method = RequestMethod.GET)
+    @ResponseBody
+    public AjaxResult mnDataOnline(@PathVariable("words") String words) {
+        if (StrUtil.isBlank(words)) {
+            words = "1";
+        }
+        //获取用户数据
+        String[] splits = words.split("[,，]");
+        for (String wordL : splits) {
+            String sql = "select a.vid,a.cust_name,a.cust_sex,a.cust_csrq,a.cust_sfzh,a.check_date,a.shop_no,a.mobile,b.test_data,c.check_data from temp_cust_info2 a left join temp_test_info2 b on a.id=b.id left join temp_check_info2 c on a.id=c.id where a.vid=?";
+            List<CustomerOnlineInfo> list = pgTemplate.query(sql, new Object[]{wordL}, new int[]{Types.VARCHAR}, new BeanPropertyRowMapper<>(CustomerOnlineInfo.class));
+            if(list.size() == 0 || list ==null){
+                    continue;
+            }
+                CustomerOnlineInfo customer = list.get(0);
+                MarketData ord = new MarketData();
+                CustomerDto customerDto = new CustomerDto();
+                customerDto.setAgentMobile(customer.getMobile());
+                customerDto.setMobile(customer.getMobile());
+                customerDto.setCustSfzh(customer.getCust_sfzh());
+                customerDto.setCheckDate(customer.getCheck_date());
+                customerDto.setCustSex(customer.getCust_sex());
+                customerDto.setShopNo(customer.getShop_no());
+                int nextInt = new Random().nextInt(99);
+                customerDto.setCustName(customer.getCust_name()+nextInt);
+                customerDto.setVid(customer.getVid()+"-ct");
+                customerDto.setCustCsrq(customer.getCust_csrq());
+                ord.setCustomer(customerDto);
+                //获取检验数据
+                ArrayList<CheckData> tTestList = new ArrayList<>();
+                List<CheckData> testDataList = JSON.parseArray(customer.getTest_data(),CheckData.class);
+                for (CheckData data : testDataList) {
+                    CheckData tData = new CheckData();
+                    tData.setCategory(data.getCategory());
+                    tData.setItemName(data.getItemName());
+                    tData.setNormalH(data.getNormalH());
+                    tData.setNormalL(data.getNormalL());
+                    tData.setResult(data.getResult());
+                    tData.setUnit(data.getUnit());
+                    tData.setItemNo(data.getItemNo());
+                    tTestList.add(tData);
+                }
+                ArrayList<CheckData> tCheckList = new ArrayList<>();
+                List<CheckData> checkDataList = JSON.parseArray(customer.getCheck_data(),CheckData.class);
+                for (CheckData data : checkDataList) {
+                    CheckData tData = new CheckData();
+                    tData.setCategory(data.getCategory());
+                    tData.setItemName(data.getItemName());
+                    tData.setNormalH(data.getNormalH());
+                    tData.setNormalL(data.getNormalL());
+                    tData.setResult(data.getResult());
+                    tData.setUnit(data.getUnit());
+                    tCheckList.add(tData);
+                }
+                ord.setCheckData(tCheckList);
+                ord.setTestData(tTestList);
+                nextInt = new Random().nextInt(9999);
+                ord.setOrderNo(System.currentTimeMillis() + String.valueOf(nextInt));
+                int nextInt2 = new Random().nextInt(9999);
+                ord.setNonceStr(System.currentTimeMillis() + String.valueOf(nextInt2));
+                ord.setUsername(SdkConstant.USER_NAME);
+                ord.setPackageId(SdkConstant.PACKAGE_ID);
+                ord.setOrderStatus(2);
+                //加密处理
+                StringBuffer sb = new StringBuffer();
+                sb.append("orderNo=" + (ord.getOrderNo() == null ? SdkConstant.NULL_STR : ord.getOrderNo()) + SdkConstant.SPLIT_OTHER);
+                sb.append("vid=" + (ord.getCustomer().getVid() == null ? SdkConstant.NULL_STR : ord.getCustomer().getVid()) + SdkConstant.SPLIT_OTHER);
+                sb.append("custName=" + (ord.getCustomer().getCustName() == null ? SdkConstant.NULL_STR : ord.getCustomer().getCustName()) + SdkConstant.SPLIT_OTHER);
+                sb.append("custSex=" + (ord.getCustomer().getCustSex() == null ? SdkConstant.NULL_STR : ord.getCustomer().getCustSex()) + SdkConstant.SPLIT_OTHER);
+                sb.append("shopNo=" + (ord.getCustomer().getShopNo() == null ? SdkConstant.NULL_STR : ord.getCustomer().getShopNo()) + SdkConstant.SPLIT_OTHER);
+                sb.append("custSfzh=" + (ord.getCustomer().getCustSfzh() == null ? SdkConstant.NULL_STR : ord.getCustomer().getCustSfzh()) + SdkConstant.SPLIT_OTHER);
+                sb.append("agentMobile=" + (ord.getCustomer().getAgentMobile() == null ? SdkConstant.NULL_STR : ord.getCustomer().getAgentMobile()) + SdkConstant.SPLIT_OTHER);
+                sb.append("checkNum=" + ((ord.getCheckData() == null || ord.getCheckData().size() == 0) ? 0 : ord.getCheckData().size()) + SdkConstant.SPLIT_OTHER);
+                sb.append("testNum=" + ((ord.getTestData() == null || ord.getTestData().size() == 0) ? 0 : ord.getTestData().size()) + SdkConstant.SPLIT_OTHER);
+                sb.append("nonceStr=" + (ord.getNonceStr() == null ? SdkConstant.NULL_STR : ord.getNonceStr()) + SdkConstant.SPLIT_OTHER);
+                sb.append("username=" + (ord.getUsername() == null ? SdkConstant.NULL_STR : ord.getUsername()));
+                AES aes = SecureUtil.aes(HexUtil.decodeHex(SdkConstant.DES_KEY));
+                String signStr = aes.encryptHex(sb.toString());
+                //数据组装
+                ord.setSignStr(signStr);
+                try {
+                    executor.submit(() -> {
+                        LOGGER.info("数据推送-》外部订单号=》[{}] 体检编号[{}]", ord.getOrderNo(), ord.getCustomer().getVid());
+                        String body = HttpRequest.post(SdkConstant.URL)
+                                .header("Content-Type", "application/json")
+                                .body(JSONUtil.parse(ord))
+                                .execute()
+                                .body();
+                        LOGGER.info("响应结果[{}]", body);
+                    });
+                } catch (Exception e) {
+                    LOGGER.warn("数据推送异常{}", JSON.toJSONString(ord), e);
+                    return AjaxResult.error("推送异常");
+                }
+        }
+        return AjaxResult.success("推送成功");
+    }
 }
