@@ -449,8 +449,8 @@ public class JdbcTemplateController {
                 CustomerDto customerDto = new CustomerDto();
                 int anInt = new Random().nextInt(99999999);
                 customerDto.setAgentMobile("176" + anInt);
-                customerDto.setMobile("18826415976");
-                customerDto.setCustSfzh("36078220081023" + nextInt);
+                customerDto.setMobile("10126410000");
+                customerDto.setCustSfzh(customer.getVid());
                 customerDto.setCheckDate(customer.getCheck_time());
                 customerDto.setCustSex(customer.getSex().toString());
                 customerDto.setShopNo(customer.getShop_no());
@@ -520,7 +520,6 @@ public class JdbcTemplateController {
                 //数据组装
                 ord.setSignStr(signStr);
                 try {
-                    executor.submit(() -> {
                         LOGGER.info("数据推送-》外部订单号=》[{}] 体检编号[{}]", ord.getOrderNo(), ord.getCustomer().getVid());
                         String body = HttpRequest.post(SdkConstant.URL)
                                 .header("Content-Type", "application/json")
@@ -528,7 +527,6 @@ public class JdbcTemplateController {
                                 .execute()
                                 .body();
                         LOGGER.info("响应结果[{}]", body);
-                    });
                 } catch (Exception e) {
                     LOGGER.warn("数据推送异常{}", JSON.toJSONString(ord), e);
                     return AjaxResult.error("推送异常");
@@ -1053,15 +1051,18 @@ public class JdbcTemplateController {
                 CustomerOnlineInfo customer = list.get(0);
                 MarketData ord = new MarketData();
                 CustomerDto customerDto = new CustomerDto();
-                customerDto.setAgentMobile(customer.getMobile());
-                customerDto.setMobile(customer.getMobile());
+                String phone = "101"+ new Random().nextInt(99999999);
+                customerDto.setAgentMobile(phone);
+                customerDto.setMobile(phone);
                 customerDto.setCustSfzh(customer.getCust_sfzh());
                 customerDto.setCheckDate(customer.getCheck_date());
                 customerDto.setCustSex(customer.getCust_sex());
                 customerDto.setShopNo(customer.getShop_no());
                 int nextInt = new Random().nextInt(99);
-                customerDto.setCustName(customer.getCust_name()+nextInt);
-                customerDto.setVid(customer.getVid()+"-ct");
+                customerDto.setCustName(customer.getCust_name());
+                customerDto.setVid(customer.getVid());
+                customerDto.setCompanyId("886991");
+                customerDto.setCompanyName("2023年武汉市农村经济经营管理局  30人");
                 customerDto.setCustCsrq(customer.getCust_csrq());
                 ord.setCustomer(customerDto);
                 //获取检验数据

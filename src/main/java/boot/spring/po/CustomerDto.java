@@ -24,9 +24,18 @@ public class CustomerDto implements Serializable {
     private String custSfzh;
     private String agentMobile;
     private String companyId;//企业ID（团检客户）
+    private String companyName;//企业名称（团检客户）
     private String ext1;//备用字段
     private String ext2;//备用字段
     private String ext3;//备用字段
+
+    public String getCompanyName() {
+        return companyName;
+    }
+
+    public void setCompanyName(String companyName) {
+        this.companyName = companyName;
+    }
 
     public String getVid() {
         return vid;
