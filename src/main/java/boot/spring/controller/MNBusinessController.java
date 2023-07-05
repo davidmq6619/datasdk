@@ -4,6 +4,7 @@ import boot.spring.constant.SdkConstant;
 import boot.spring.pagemodel.AjaxResult;
 import boot.spring.po.*;
 import cn.hutool.core.date.DateField;
+import cn.hutool.core.date.DateTime;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.HexUtil;
 import cn.hutool.core.util.NumberUtil;
@@ -284,9 +285,9 @@ public class MNBusinessController {
             customerDto.setMobile(mobile);
             customerDto.setCustSfzh(customer.getCertificate_number());
             String sex = customer.getSex();
-            if(StrUtil.isNotBlank(sex) && "FEMALE".equals(sex)){
+            if (StrUtil.isNotBlank(sex) && "FEMALE".equals(sex)) {
                 sex = "0";
-            }else {
+            } else {
                 sex = "1";
             }
             customerDto.setCustSex(sex);
@@ -298,7 +299,7 @@ public class MNBusinessController {
             Date checkTime = customer.getCheck_time();
             customerDto.setCheckDate(checkTime);
             Date birthday = new Date();
-            if(StrUtil.isNotBlank(age) && checkTime !=null){
+            if (StrUtil.isNotBlank(age) && checkTime != null) {
                 birthday = DateUtil.offset(checkTime, DateField.YEAR, -Integer.valueOf(age));
             }
             customerDto.setCustCsrq(birthday);
@@ -308,11 +309,11 @@ public class MNBusinessController {
             ArrayList<CheckData> tCheckList = new ArrayList<>();
             String checkSql = "select vid,big_category,item_ft,item_name,unit,result,normal_l from mn_bianque_check_info  where vid =?";
             List<MnBianqueCheckInfo> dataList = pgTemplate.query(checkSql, new Object[]{vid}, new int[]{Types.VARCHAR}, new BeanPropertyRowMapper<>(MnBianqueCheckInfo.class));
-            if(CollectionUtils.isEmpty(dataList)){
+            if (CollectionUtils.isEmpty(dataList)) {
                 continue;
             }
             for (MnBianqueCheckInfo data : dataList) {
-                if("LAB".equals(data.getBig_category())){
+                if ("LAB".equals(data.getBig_category())) {
                     CheckData tData = new CheckData();
                     tData.setCategory(data.getItem_ft());
                     tData.setItemName(data.getItem_name());
@@ -321,7 +322,7 @@ public class MNBusinessController {
                     tData.setResult(data.getResult());
                     tData.setUnit(data.getUnit());
                     tTestList.add(tData);
-                }else {
+                } else {
                     CheckData checkData = new CheckData();
                     checkData.setCategory(data.getItem_ft());
                     checkData.setItemName(data.getItem_name());
@@ -335,12 +336,12 @@ public class MNBusinessController {
             /**
              * 小结处理
              */
-            String xiaojieSql ="select vid,item_ft,result from mn_bianque_xiaojie_info where vid =?";
+            String xiaojieSql = "select vid,item_ft,result from mn_bianque_xiaojie_info where vid =?";
             List<MnBianqueCheckInfo> xiaojieDataList = pgTemplate.query(xiaojieSql, new Object[]{vid}, new int[]{Types.VARCHAR}, new BeanPropertyRowMapper<>(MnBianqueCheckInfo.class));
             for (MnBianqueCheckInfo data : xiaojieDataList) {
                 List<String> resultStrList = new ArrayList<>();
                 String results = data.getResult();
-                if(StrUtil.isBlank(results)){
+                if (StrUtil.isBlank(results)) {
                     continue;
                 }
                 results = results.replace("\\", "");
@@ -349,7 +350,7 @@ public class MNBusinessController {
                     resultStrList.add(o.getConclusionName());
                 }
                 String result = "";
-                if(resultStrList.size() > 0){
+                if (resultStrList.size() > 0) {
                     result = resultStrList.stream().collect(Collectors.joining("。"));
                 }
                 CheckData checkData = new CheckData();
@@ -396,6 +397,199 @@ public class MNBusinessController {
                 LOGGER.warn("数据推送异常{}", JSON.toJSONString(ord), e);
                 return AjaxResult.error("推送异常");
             }
+        }
+        return AjaxResult.success("推送成功");
+    }
+
+    @ApiOperation("数据统计-mdt报告")
+    @RequestMapping(value = "/meinian/pushMnData", method = RequestMethod.GET)
+    @ResponseBody
+    public AjaxResult pushMnData() {
+        String sql = "select * from check_data_temp";
+        List<CheckDataDto> list = pgTemplate.query(sql, new Object[]{}, new int[]{}, new BeanPropertyRowMapper<>(CheckDataDto.class));
+        for (CheckDataDto checkdata : list) {
+            List<CheckDto> listCheck = JSON.parseArray(checkdata.getCheck_data(), CheckDto.class);
+            String vid = checkdata.getVid();
+            for (CheckDto dto : listCheck) {
+                String category = dto.getCategory();
+                String itemName = dto.getItemName();
+                String result = dto.getResult();
+                if (StrUtil.isNotBlank(result) && !NumberUtil.isNumber(result)) {
+                    String insertsql = "INSERT INTO \"mn_check_data\" (\"vid\", \"category\", \"item_name\", \"result\")" +
+                            " VALUES ('" + vid + "','" + category + "','" + itemName + "','" + result + "')";
+                    pgTemplate.execute(insertsql);
+                }
+            }
+        }
+        return AjaxResult.success("推送成功");
+    }
+
+    @ApiOperation("数据统计-mdt报告-统计检查大项分类")
+    @RequestMapping(value = "/meinian/pushMnDataTJ", method = RequestMethod.GET)
+    @ResponseBody
+    public AjaxResult pushMnDataTJ() {
+        String sql = "select * from mn_check_data";
+        List<MnCheckDataDto> list = pgTemplate.query(sql, new Object[]{}, new int[]{}, new BeanPropertyRowMapper<>(MnCheckDataDto.class));
+        Map<String, Map<String, List<MnCheckDataDto>>> collect = list.stream().filter(item -> StrUtil.isNotBlank(
+                item.getCategory()) && !item.getCategory().contains("总检")
+                && !item.getCategory().contains("总结")
+                && !"null".equals(item.getCategory())
+                && StrUtil.isNotBlank(item.getItem_name())
+        ).collect(Collectors.groupingBy(MnCheckDataDto::getCategory, Collectors.groupingBy(MnCheckDataDto::getItem_name)));
+        Iterator<String> iterator = collect.keySet().iterator();
+        List<MnCheckDataDto> listResult = new ArrayList<>();
+        while (iterator.hasNext()) {
+            String category = iterator.next();
+            Map<String, List<MnCheckDataDto>> map = collect.get(category);
+            Iterator<String> iterator1 = map.keySet().iterator();
+            while (iterator1.hasNext()) {
+                String itemName = iterator1.next();
+                List<MnCheckDataDto> listDto = map.get(itemName);
+                List<MnCheckDataDto> listData = listDto.stream().sorted(Comparator.comparing(item -> item.getResult().length())).collect(Collectors.toList());
+                MnCheckDataDto dto = listData.get(listData.size() - 1);
+                listResult.add(dto);
+            }
+        }
+        for (MnCheckDataDto dto : listResult) {
+            String category = dto.getCategory();
+            String itemName = dto.getItem_name();
+            String result = dto.getResult();
+            if (StrUtil.isNotBlank(result) && !NumberUtil.isNumber(result)) {
+                String insertsql = "INSERT INTO \"mn_check_data_insert\" (\"category\", \"item_name\", \"result\")" +
+                        " VALUES ('" + category + "','" + itemName + "','" + result + "')";
+                pgTemplate.execute(insertsql);
+            }
+        }
+        return AjaxResult.success("推送成功");
+    }
+
+    @ApiOperation("数据推送-ai数据清洗验证")
+    @RequestMapping(value = "/meinian/aiPushData", method = RequestMethod.GET)
+    @ResponseBody
+    public AjaxResult aiPushData() {
+        String sql = "select * from mn_check_data";
+        List<MnCheckDataDto> list = pgTemplate.query(sql, new Object[]{}, new int[]{}, new BeanPropertyRowMapper<>(MnCheckDataDto.class));
+        Map<String, List<MnCheckDataDto>> collect = list.stream().collect(Collectors.groupingBy(MnCheckDataDto::getVid));
+        Iterator<String> iterator = collect.keySet().iterator();
+        while (iterator.hasNext()) {
+            String vid = iterator.next();
+            List<MnCheckDataDto> mnCheckData = collect.get(vid);
+            MarketData ord = new MarketData();
+            int nextInt = new Random().nextInt(9999);
+            CustomerDto customerDto = new CustomerDto();
+            int anInt = new Random().nextInt(99999999);
+            customerDto.setAgentMobile("176" + anInt);
+            customerDto.setMobile("10126410000");
+            customerDto.setCustSfzh(vid);
+            customerDto.setCheckDate(new Date());
+            customerDto.setCustSex("1");
+            customerDto.setShopNo("998");
+            String name = "xx" + nextInt;
+            customerDto.setCustName(name);
+            customerDto.setVid(vid);
+            DateTime dateTime = DateUtil.parse("1996-06-18", "yyyy-MM-dd");
+            customerDto.setCustCsrq(dateTime);
+            ord.setCustomer(customerDto);
+            //获取检验数据
+            ArrayList<CheckData> tTestList = new ArrayList<>();
+            CheckData tData = new CheckData();
+            tTestList.add(tData);
+
+            ArrayList<CheckData> tCheckList = new ArrayList<>();
+            for (MnCheckDataDto data : mnCheckData) {
+                CheckData checkData = new CheckData();
+                checkData.setCategory(data.getCategory());
+                checkData.setItemName(data.getItem_name());
+                checkData.setResult(data.getResult());
+                tCheckList.add(checkData);
+            }
+            ord.setCheckData(tCheckList);
+            ord.setTestData(tTestList);
+            nextInt = new Random().nextInt(9999);
+            ord.setOrderNo(System.currentTimeMillis() + String.valueOf(nextInt));
+            int nextInt2 = new Random().nextInt(9999);
+            ord.setNonceStr(System.currentTimeMillis() + String.valueOf(nextInt2));
+            ord.setUsername(SdkConstant.USER_NAME);
+            ord.setPackageId(SdkConstant.PACKAGE_ID);
+            ord.setOrderStatus(2);
+            //加密处理
+            StringBuffer sb = new StringBuffer();
+            sb.append("orderNo=" + (ord.getOrderNo() == null ? SdkConstant.NULL_STR : ord.getOrderNo()) + SdkConstant.SPLIT_OTHER);
+            sb.append("vid=" + (ord.getCustomer().getVid() == null ? SdkConstant.NULL_STR : ord.getCustomer().getVid()) + SdkConstant.SPLIT_OTHER);
+            sb.append("custName=" + (ord.getCustomer().getCustName() == null ? SdkConstant.NULL_STR : ord.getCustomer().getCustName()) + SdkConstant.SPLIT_OTHER);
+            sb.append("custSex=" + (ord.getCustomer().getCustSex() == null ? SdkConstant.NULL_STR : ord.getCustomer().getCustSex()) + SdkConstant.SPLIT_OTHER);
+            sb.append("shopNo=" + (ord.getCustomer().getShopNo() == null ? SdkConstant.NULL_STR : ord.getCustomer().getShopNo()) + SdkConstant.SPLIT_OTHER);
+            sb.append("custSfzh=" + (ord.getCustomer().getCustSfzh() == null ? SdkConstant.NULL_STR : ord.getCustomer().getCustSfzh()) + SdkConstant.SPLIT_OTHER);
+            sb.append("agentMobile=" + (ord.getCustomer().getAgentMobile() == null ? SdkConstant.NULL_STR : ord.getCustomer().getAgentMobile()) + SdkConstant.SPLIT_OTHER);
+            sb.append("checkNum=" + ((ord.getCheckData() == null || ord.getCheckData().size() == 0) ? 0 : ord.getCheckData().size()) + SdkConstant.SPLIT_OTHER);
+            sb.append("testNum=" + ((ord.getTestData() == null || ord.getTestData().size() == 0) ? 0 : ord.getTestData().size()) + SdkConstant.SPLIT_OTHER);
+            sb.append("nonceStr=" + (ord.getNonceStr() == null ? SdkConstant.NULL_STR : ord.getNonceStr()) + SdkConstant.SPLIT_OTHER);
+            sb.append("username=" + (ord.getUsername() == null ? SdkConstant.NULL_STR : ord.getUsername()));
+            AES aes = SecureUtil.aes(HexUtil.decodeHex(SdkConstant.DES_KEY));
+            String signStr = aes.encryptHex(sb.toString());
+            //数据组装
+            ord.setSignStr(signStr);
+            try {
+                LOGGER.info("数据推送-》外部订单号=》[{}] 体检编号[{}]", ord.getOrderNo(), ord.getCustomer().getVid());
+                String body = HttpRequest.post(SdkConstant.URL)
+                        .header("Content-Type", "application/json")
+                        .body(JSONUtil.parse(ord))
+                        .execute()
+                        .body();
+                LOGGER.info("响应结果[{}]", body);
+            } catch (Exception e) {
+                LOGGER.warn("数据推送异常{}", JSON.toJSONString(ord), e);
+                return AjaxResult.error("推送异常");
+            }
+        }
+        return AjaxResult.success("推送成功");
+    }
+
+    @ApiOperation("数据统计-mdt报告-ai核对")
+    @RequestMapping(value = "/meinian/aiMnDataTJ", method = RequestMethod.GET)
+    @ResponseBody
+    public AjaxResult aiMnDataTJ() {
+        String sql = "select * from check_data_temp_ai";
+        List<CheckDataVo> list = pgTemplate.query(sql, new Object[]{}, new int[]{}, new BeanPropertyRowMapper<>(CheckDataVo.class));
+        for (CheckDataVo checkdata : list) {
+            List<CheckVo> listCheck = JSON.parseArray(checkdata.getCheck_data(), CheckVo.class);
+            List<CheckVo> listDiagnosis = JSON.parseArray(checkdata.getDiagnosis_data(), CheckVo.class);
+            String vid = checkdata.getVid();
+            List<CheckVo> collectCheck = listCheck.stream().filter(item -> StrUtil.isNotBlank(item.getTraceData())).collect(Collectors.toList());
+            for (CheckVo dto : collectCheck) {
+                String category = "";
+                String itemName ="";
+                String diseaseType = dto.getItemName();
+                String result = dto.getItemResults();
+                String traceData = dto.getTraceData();
+                String[] split = traceData.split("@@");
+                if(split.length == 3){
+                    category = split[0];
+                    itemName = split[1];
+                    traceData = split[2];
+                }
+                if (StrUtil.isNotBlank(result)) {
+                    String insertsql = "INSERT INTO \"mn_check_data_result\" (\"vid\", \"category\", \"item_name\", \"result\" , \"trace_data\", \"disease_type\")" +
+                            " VALUES ('" + vid + "','" + category + "','" + itemName + "','" + result + "','" + traceData + "','" + diseaseType + "')";
+                    pgTemplate.execute(insertsql);
+                }
+            }
+
+            List<CheckVo> collectDisease = listDiagnosis.stream().filter(item -> StrUtil.isNotBlank(item.getTraceData())).collect(Collectors.toList());
+            for (CheckVo dto : collectDisease) {
+                String category = "总结";
+                String itemName ="总结";
+                String diseaseType = dto.getItemName();
+                String result = dto.getResult();
+                String traceData = dto.getTraceData();
+                if (StrUtil.isNotBlank(result)) {
+                    String insertsql = "INSERT INTO \"mn_check_data_result\" (\"vid\", \"category\", \"item_name\", \"result\" , \"trace_data\", \"disease_type\")" +
+                            " VALUES ('" + vid + "','" + category + "','" + itemName + "','" + result + "','" + traceData + "','" + diseaseType + "')";
+                    pgTemplate.execute(insertsql);
+                }
+            }
+
+
         }
         return AjaxResult.success("推送成功");
     }
