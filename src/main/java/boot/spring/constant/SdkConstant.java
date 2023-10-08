@@ -7,15 +7,21 @@ package boot.spring.constant;
  */
 public class SdkConstant {
     //测试环境
-    public static String DES_KEY = "d802f2a74561782854656f729fb3a746";
+    //public static String DES_KEY = "10bc8876d7bf7d9ebdde62b0cf24583e";
+    //美年测试
+    public static String DES_KEY ="d802f2a74561782854656f729fb3a746";
     public static String NULL_STR = "";
     public static String SPLIT_OTHER = "&";
-    public static String USER_NAME = "ai_yanzheng";
+    //演示环境
+    //public static String USER_NAME = "oom";
+    //美年测试环境
+    public static String USER_NAME ="ai_yanzheng";
     //public static String URL="http://192.168.16.54:30190/v1/sdk/order/group/push";//测试二
     public static String URL="http://192.168.16.54:31001/v1/sdk/order/group/push";//美年测试
     //public static String URL="https://service.health-100.cn/v1/sdk/order/create";
+    //public static String URL="http://192.168.16.186:32001/v1/sdk/order/group/push";//演示环境
     public static String PACKAGE_ID = "21152S";
-    public static String SHOP_NO = "996";
+    public static String SHOP_NO = "14825";
     public static String JDBC_DRIVER = "org.postgresql.Driver";
     //public static String JDBC_URL = "jdbc:postgresql://pgm-uf60r06h2h8cv295.pg.rds.aliyuncs.com:5432/etl1";
     //public static String JDBC_NAME = "whe_lkw";
