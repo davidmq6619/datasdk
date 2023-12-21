@@ -1,15 +1,16 @@
 package boot.spring.po;
 
-import cn.afterturn.easypoi.excel.annotation.Excel;
+
+import com.alibaba.excel.annotation.ExcelProperty;
 
 public class City {
-	@Excel(name = "编号", width=10)
+	@ExcelProperty("编号")
 	private Integer city_id;
 	
-	@Excel(name = "城市")
+	@ExcelProperty("城市")
 	private String city;
 	
-	@Excel(name = "最后更新日期", width=20)
+	@ExcelProperty("最后更新日期")
 	private String last_update;
 	
 	private Country country;

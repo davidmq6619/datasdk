@@ -1,27 +1,27 @@
 package boot.spring.po;
 
-import java.io.Serializable;
-
-import cn.afterturn.easypoi.excel.annotation.Excel;
+import com.alibaba.excel.annotation.ExcelProperty;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+
+import java.io.Serializable;
 
 @ApiModel("演员表")
 public class Actor implements Serializable {
 	@ApiModelProperty("主键")
-	@Excel(name = "编号", width=10)
+	@ExcelProperty("编号")
 	private Integer actor_id;
 	
 	@ApiModelProperty("名字")
-	@Excel(name = "名字")
+	@ExcelProperty("名字")
 	private String first_name;
 	
 	@ApiModelProperty("姓氏")
-	@Excel(name = "姓氏")
+	@ExcelProperty("姓氏")
 	private String last_name;
 	
 	@ApiModelProperty("最后更新日期")
-	@Excel(name = "最后更新日期", width=20)
+	@ExcelProperty("最后更新日期")
 	private String last_update;
 	
 	public Actor() {
